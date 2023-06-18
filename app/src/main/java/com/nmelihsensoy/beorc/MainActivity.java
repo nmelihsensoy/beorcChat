@@ -1,6 +1,7 @@
 package com.nmelihsensoy.beorc;
 
 import android.annotation.SuppressLint;
+import android.app.Activity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothServerSocket;
@@ -11,24 +12,25 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
-import android.os.Message;
 import android.util.Log;
-import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.inputmethod.EditorInfo;
 import android.widget.EditText;
-import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.core.app.ActivityCompat;
+import androidx.core.content.IntentCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.UUID;
 
@@ -41,7 +43,9 @@ public class MainActivity extends AppCompatActivity {
     private int connectionState = -1;
     private CustomAdapter messageAdapter;
     private ArrayList<MessageData> messageStoreList;
-    private PeerListener chatPeer = null;
+    private PeerConnWaiter chatPeer = null;
+    private PeerMessageWaiter chatReceiver = null;
+    private RecyclerView recyclerView = null;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -66,7 +70,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void initMessageList(){
-        RecyclerView recyclerView = findViewById(R.id.message_list);
+        recyclerView = findViewById(R.id.message_list);
         messageStoreList = new ArrayList<>();
         messageAdapter = new CustomAdapter(messageStoreList);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
@@ -76,6 +80,12 @@ public class MainActivity extends AppCompatActivity {
     private void clearMessageList(){
         messageStoreList.clear();
         messageAdapter.notifyDataSetChanged();
+    }
+
+    private void scrollMessageListToLatest(){
+        if(recyclerView != null){
+            recyclerView.scrollToPosition(messageStoreList.size() - 1);
+        }
     }
 
     private void setConnectedDeviceTitle(String deviceName){
@@ -149,32 +159,46 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        if(availableSocket == null){
-            chatPeer = new PeerListener();
-            chatPeer.start();
-        }else if(availableSocket != null && !availableSocket.isConnected()){
-            chatPeer = new PeerListener();
-            chatPeer.start();
+    }
+
+    /* https://stackoverflow.com/a/48758656 */
+    public void restartApplication(final @NonNull Activity activity) {
+        final PackageManager pm = activity.getPackageManager();
+        final Intent intent = pm.getLaunchIntentForPackage(activity.getPackageName());
+        activity.finishAffinity();
+        activity.startActivity(intent);
+        System.exit(0);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (availableSocket != null){
+            if(this.availableSocket.isConnected()){
+                try {
+                    this.availableSocket.close();
+                } catch (IOException e) {
+
+                }
+            }
         }
+        chatPeer = null;
+        connectionState = -1;
+        chatReceiver = null;
+        Runtime.getRuntime().gc();
     }
 
     @Override
     protected void onStart() {
         super.onStart();
         enableBt();
+        chatPeer = new PeerConnWaiter();
+        chatPeer.start();
     }
 
     @Override
     protected void onStop() {
         super.onStop();
-        if(availableSocket != null){
-            try {
-                availableSocket.close();
-                chatPeer = null;
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        }
     }
 
     private void getAllRuntimePerms(){
@@ -248,24 +272,51 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    private void newMessageUi(MessageData msg){
+        runOnUiThread(() -> {
+            this.newMessage(msg);
+            this.scrollMessageListToLatest();
+        });
+    }
+
     private void sendMessage(String messageLine){
         if(!messageLine.isEmpty()){
             Log.d(TAG, messageLine);
+            newMessage(new MessageData(messageLine, 2));
+            scrollMessageListToLatest();
+            writeToSocket(messageLine.getBytes());
         }
     }
 
     private void disconnectPeer(){
-        if(availableSocket != null){
-            try {
-                availableSocket.close();
-                chatPeer = null;
-                setUiDisconnected();
-            } catch (IOException e) {
-                throw new RuntimeException(e);
+        runOnUiThread(() -> {
+            if (availableSocket != null){
+                if(this.availableSocket.isConnected()){
+                    try {
+                        this.availableSocket.close();
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
             }
+            restartApplication(MainActivity.this);
+        });
+    }
+
+
+    private void writeToSocket(byte[] value){
+        OutputStream tmpOut = null;
+        try {
+            tmpOut = availableSocket.getOutputStream();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
-        chatPeer = new PeerListener();
-        chatPeer.start();
+
+        try {
+            tmpOut.write(value);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @SuppressLint("MissingPermission")
@@ -286,6 +337,8 @@ public class MainActivity extends AppCompatActivity {
 
         availableSocket = tmp;
         setUiConnected(device.getName());
+        chatReceiver = new PeerMessageWaiter();
+        chatReceiver.start();
     }
 
     private final BroadcastReceiver nativeDevicePickerReceiver = new BroadcastReceiver() {
@@ -326,7 +379,7 @@ public class MainActivity extends AppCompatActivity {
         }
     };
 
-    private class PeerListener extends Thread {
+    private class PeerConnWaiter extends Thread {
         @SuppressLint("MissingPermission")
         public void run() {
 
@@ -352,9 +405,35 @@ public class MainActivity extends AppCompatActivity {
 
                     connectionState = 1;
                     setUiConnected(availableSocket.getRemoteDevice().getName());
+                    chatReceiver = new PeerMessageWaiter();
+                    chatReceiver.start();
                 }
             }
         }
     }
 
+    private class PeerMessageWaiter extends Thread {
+        @SuppressLint("MissingPermission")
+        public void run() {
+            byte[] buffer = new byte[1024];
+            int bytes;
+            InputStream tmpIn = null;
+
+            try {
+                tmpIn = availableSocket.getInputStream();
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+
+            try {
+                while((bytes = tmpIn.read(buffer))!=-1) {
+                    String readMessage = new String(buffer, 0, bytes);
+                    Log.d(TAG, "RECEIVED: " + readMessage);
+                    newMessageUi(new MessageData(readMessage, 1));
+                }
+            } catch (IOException e) {
+                disconnectPeer();
+            }
+        }
+    }
 }
