@@ -1,5 +1,9 @@
 package com.nmelihsensoy.beorc;
 
+import android.annotation.SuppressLint;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothSocket;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Message;
@@ -15,9 +19,17 @@ import androidx.core.app.ActivityCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import java.util.ArrayList;
+import java.util.UUID;
+
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "BeorcDEBUG";
+    private static final UUID BEORC_UUID = UUID.fromString("A512FD83-E493-4D41-BB12-EF747B192056");
     Menu topBarMenu;
+    private BluetoothSocket availableSocket;
+    private int connectionState = -1;
+    private CustomAdapter messageAdapter;
+    private ArrayList<MessageData> messageStoreList;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -28,22 +40,23 @@ public class MainActivity extends AppCompatActivity {
         Toolbar toolbar1 = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar1);
         toolbar1.setSubtitle("not connected");
-
-        testMessageBubble();
+        initMessageList();
+        //new MessageData("hello pong", 1)
     }
 
-    private void testMessageBubble(){
-        MessageData[] myList = new MessageData[]{
-                new MessageData("hello ping", 1),
-                new MessageData("hello pong", 2),
-                new MessageData("acknowledgement", 1),
-                new MessageData("acknowledgement", 2)
-        };
-
+    private void initMessageList(){
         RecyclerView recyclerView = findViewById(R.id.message_list);
-        CustomAdapter adapter = new CustomAdapter(myList);
+        messageStoreList = new ArrayList<>();
+        messageAdapter = new CustomAdapter(messageStoreList);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
-        recyclerView.setAdapter(adapter);
+        recyclerView.setAdapter(messageAdapter);
+    }
+
+    private void newMessage(MessageData msg){
+        if(!msg.getMessage().isEmpty()){
+            messageStoreList.add(msg);
+            messageAdapter.notifyDataSetChanged();
+        }
     }
 
     @Override
@@ -66,15 +79,30 @@ public class MainActivity extends AppCompatActivity {
         }
         if (id == R.id.menu_discoverable) {
             Log.d(TAG, "Menu Discoverable");
+            makeDiscoverable();
             return true;
         }
         if (id == R.id.menu_disconnect) {
             Log.d(TAG, "Menu Disconnect");
             return true;
         }
-
-
         return super.onOptionsItemSelected(item);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        enableBt();
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
     }
 
     private void getAllRuntimePerms(){
@@ -100,6 +128,26 @@ public class MainActivity extends AppCompatActivity {
                 MainActivity.this.finish();
                 System.exit(0);
             }
+        }
+    }
+
+    @SuppressLint("MissingPermission")
+    private void makeDiscoverable(){
+        Intent discoverableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
+        discoverableIntent.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 60);
+        startActivity(discoverableIntent);
+    }
+
+    @SuppressLint("MissingPermission")
+    private void enableBt(){
+        if(BluetoothAdapter.getDefaultAdapter() == null){
+            MainActivity.this.finish();
+            System.exit(0);
+        }
+
+        if(BluetoothAdapter.getDefaultAdapter().isEnabled()){
+            Intent enableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+            startActivity(enableIntent);
         }
     }
 

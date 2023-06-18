@@ -9,9 +9,10 @@ import android.widget.TextView;
 
 import androidx.recyclerview.widget.RecyclerView;
 
-public class CustomAdapter extends RecyclerView.Adapter<CustomAdapter.ViewHolder> {
+import java.util.ArrayList;
 
-    private MessageData[] localDataSet;
+public class CustomAdapter extends RecyclerView.Adapter<CustomAdapter.ViewHolder> {
+    private ArrayList<MessageData> localDataSet;
 
     /**
      * Provide a reference to the type of views that you are using
@@ -38,7 +39,7 @@ public class CustomAdapter extends RecyclerView.Adapter<CustomAdapter.ViewHolder
      * @param dataSet String[] containing the data to populate views to be used
      * by RecyclerView
      */
-    public CustomAdapter(MessageData[] dataSet) {
+    public CustomAdapter(ArrayList<MessageData> dataSet) {
         localDataSet = dataSet;
     }
 
@@ -64,18 +65,18 @@ public class CustomAdapter extends RecyclerView.Adapter<CustomAdapter.ViewHolder
     @Override
     public void onBindViewHolder(ViewHolder viewHolder, final int position) {
 
-        final MessageData data = localDataSet[position];
+        final MessageData data = localDataSet.get(position);
         viewHolder.getTextView().setText(data.getMessage());
     }
 
     @Override
     public int getItemViewType(int position) {
-        return localDataSet[position].getType();
+        return localDataSet.get(position).getType();
     }
 
     // Return the size of your dataset (invoked by the layout manager)
     @Override
     public int getItemCount() {
-        return localDataSet.length;
+        return localDataSet.size();
     }
 }
