@@ -1,14 +1,17 @@
 package com.nmelihsensoy.beorc;
 
+import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Message;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
+import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
+import androidx.core.app.ActivityCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -19,6 +22,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        getAllRuntimePerms();
         setContentView(R.layout.activity_main);
 
         Toolbar toolbar1 = (Toolbar) findViewById(R.id.toolbar);
@@ -71,6 +75,32 @@ public class MainActivity extends AppCompatActivity {
 
 
         return super.onOptionsItemSelected(item);
+    }
+
+    private void getAllRuntimePerms(){
+
+        ActivityCompat.requestPermissions(MainActivity.this, new String[]
+            {
+                android.Manifest.permission.BLUETOOTH_SCAN,
+                android.Manifest.permission.BLUETOOTH_ADMIN,
+                android.Manifest.permission.BLUETOOTH_CONNECT,
+                android.Manifest.permission.BLUETOOTH_ADVERTISE,
+                android.Manifest.permission.ACCESS_COARSE_LOCATION,
+                android.Manifest.permission.ACCESS_FINE_LOCATION
+            }, 1);
+
+        if(
+            (ActivityCompat. checkSelfPermission(MainActivity.this, android. Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager. PERMISSION_GRANTED) ||
+            (ActivityCompat. checkSelfPermission(MainActivity.this, android. Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager. PERMISSION_GRANTED) ||
+            (ActivityCompat. checkSelfPermission(MainActivity.this, android. Manifest.permission.BLUETOOTH_ADVERTISE) != PackageManager. PERMISSION_GRANTED) ||
+            (ActivityCompat. checkSelfPermission(MainActivity.this, android. Manifest.permission.BLUETOOTH_CONNECT) != PackageManager. PERMISSION_GRANTED)
+        ){
+            Toast.makeText(this, "Accept Permissions!", Toast.LENGTH_LONG).show();
+            if (android.os.Build.VERSION.SDK_INT > 31){
+                MainActivity.this.finish();
+                System.exit(0);
+            }
+        }
     }
 
 }
