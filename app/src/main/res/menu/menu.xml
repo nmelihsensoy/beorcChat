@@ -8,5 +8,6 @@
         android:title="Make discoverable" />
 
     <item android:id="@+id/menu_disconnect"
+        android:enabled="false"
         android:title="Disconnect" />
 </menu>
