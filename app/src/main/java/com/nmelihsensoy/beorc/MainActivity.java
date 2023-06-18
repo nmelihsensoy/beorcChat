@@ -13,10 +13,13 @@ import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Message;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
+import android.view.inputmethod.EditorInfo;
 import android.widget.EditText;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -47,7 +50,19 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         setConnectedDeviceTitle();
         initMessageList();
-        //new MessageData("hello pong", 1)
+        initMessageBox();
+    }
+
+    private void initMessageBox(){
+        EditText editText = findViewById(R.id.msgText);
+        editText.setOnEditorActionListener((textView, i, keyEvent) -> {
+            if(i == EditorInfo.IME_ACTION_DONE){
+                sendMessage(textView.getText().toString());
+                textView.setText("");
+                return true;
+            }
+            return false;
+        });
     }
 
     private void initMessageList(){
@@ -233,6 +248,12 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    private void sendMessage(String messageLine){
+        if(!messageLine.isEmpty()){
+            Log.d(TAG, messageLine);
+        }
+    }
+
     private void disconnectPeer(){
         if(availableSocket != null){
             try {
@@ -310,7 +331,6 @@ public class MainActivity extends AppCompatActivity {
         public void run() {
 
             BluetoothServerSocket tmp;
-            Log.d("BUTTONS", "User tapped the Supabutton");
             try {
                 tmp = BluetoothAdapter.getDefaultAdapter().listenUsingInsecureRfcommWithServiceRecord(
                         BEORC_NAME, BEORC_UUID);
