@@ -24,7 +24,6 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.core.app.ActivityCompat;
-import androidx.core.content.IntentCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -46,15 +45,65 @@ public class MainActivity extends AppCompatActivity {
     private PeerConnWaiter chatPeer = null;
     private PeerMessageWaiter chatReceiver = null;
     private RecyclerView recyclerView = null;
+    private BluetoothAdapter devAdapter = null;
 
+    @SuppressLint("MissingPermission")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        getAllRuntimePerms();
+        super.onCreate(null);
+        ActivityCompat.requestPermissions(MainActivity.this, new String[]
+            {
+                android.Manifest.permission.BLUETOOTH_SCAN,
+                android.Manifest.permission.BLUETOOTH_ADMIN,
+                android.Manifest.permission.BLUETOOTH_CONNECT,
+                android.Manifest.permission.BLUETOOTH_ADVERTISE,
+                android.Manifest.permission.ACCESS_COARSE_LOCATION,
+                android.Manifest.permission.ACCESS_FINE_LOCATION
+            }, 1);
+
+        if(
+            (ActivityCompat.checkSelfPermission(MainActivity.this, android. Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager. PERMISSION_GRANTED) ||
+            (ActivityCompat.checkSelfPermission(MainActivity.this, android. Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager. PERMISSION_GRANTED) ||
+            (ActivityCompat.checkSelfPermission(MainActivity.this, android. Manifest.permission.BLUETOOTH_ADVERTISE) != PackageManager. PERMISSION_GRANTED) ||
+            (ActivityCompat.checkSelfPermission(MainActivity.this, android. Manifest.permission.BLUETOOTH_CONNECT) != PackageManager. PERMISSION_GRANTED)
+        ){
+            if (android.os.Build.VERSION.SDK_INT > 31){
+                Toast.makeText(this, "Accept Permissions!", Toast.LENGTH_LONG).show();
+                MainActivity.this.finish();
+                System.exit(0);
+            }
+        }
+
+        devAdapter = BluetoothAdapter.getDefaultAdapter();
+        if(!devAdapter.isEnabled()){
+            Intent enableIntent = new Intent(devAdapter.ACTION_REQUEST_ENABLE);
+            startActivity(enableIntent);
+        }
+
+        while(!devAdapter.isEnabled()){
+            try {
+                Thread.sleep(200);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
         setContentView(R.layout.activity_main);
         setConnectedDeviceTitle();
         initMessageList();
         initMessageBox();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if(availableSocket == null){
+            chatPeer = new PeerConnWaiter();
+            chatPeer.start();
+        }else if(availableSocket != null && !availableSocket.isConnected()){
+            chatPeer = new PeerConnWaiter();
+            chatPeer.start();
+        }
     }
 
     private void initMessageBox(){
@@ -90,14 +139,18 @@ public class MainActivity extends AppCompatActivity {
 
     private void setConnectedDeviceTitle(String deviceName){
         Toolbar toolbar1 = (Toolbar) findViewById(R.id.toolbar);
-        setSupportActionBar(toolbar1);
-        toolbar1.setSubtitle("connected: "+deviceName);
+        if(toolbar1 != null){
+            setSupportActionBar(toolbar1);
+            toolbar1.setSubtitle("connected: "+deviceName);
+        }
     }
 
     private void setConnectedDeviceTitle(){
         Toolbar toolbar1 = (Toolbar) findViewById(R.id.toolbar);
-        setSupportActionBar(toolbar1);
-        toolbar1.setSubtitle("not connected");
+        if(toolbar1 != null){
+            setSupportActionBar(toolbar1);
+            toolbar1.setSubtitle("not connected");
+        }
     }
 
     private void newMessage(MessageData msg){
@@ -156,11 +209,6 @@ public class MainActivity extends AppCompatActivity {
         return super.onOptionsItemSelected(item);
     }
 
-    @Override
-    protected void onResume() {
-        super.onResume();
-    }
-
     /* https://stackoverflow.com/a/48758656 */
     public void restartApplication(final @NonNull Activity activity) {
         final PackageManager pm = activity.getPackageManager();
@@ -188,43 +236,10 @@ public class MainActivity extends AppCompatActivity {
         Runtime.getRuntime().gc();
     }
 
-    @Override
-    protected void onStart() {
-        super.onStart();
-        enableBt();
-        chatPeer = new PeerConnWaiter();
-        chatPeer.start();
-    }
-
-    @Override
-    protected void onStop() {
-        super.onStop();
-    }
-
-    private void getAllRuntimePerms(){
-
-        ActivityCompat.requestPermissions(MainActivity.this, new String[]
-            {
-                android.Manifest.permission.BLUETOOTH_SCAN,
-                android.Manifest.permission.BLUETOOTH_ADMIN,
-                android.Manifest.permission.BLUETOOTH_CONNECT,
-                android.Manifest.permission.BLUETOOTH_ADVERTISE,
-                android.Manifest.permission.ACCESS_COARSE_LOCATION,
-                android.Manifest.permission.ACCESS_FINE_LOCATION
-            }, 1);
-
-        if(
-            (ActivityCompat.checkSelfPermission(MainActivity.this, android. Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager. PERMISSION_GRANTED) ||
-            (ActivityCompat.checkSelfPermission(MainActivity.this, android. Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager. PERMISSION_GRANTED) ||
-            (ActivityCompat.checkSelfPermission(MainActivity.this, android. Manifest.permission.BLUETOOTH_ADVERTISE) != PackageManager. PERMISSION_GRANTED) ||
-            (ActivityCompat.checkSelfPermission(MainActivity.this, android. Manifest.permission.BLUETOOTH_CONNECT) != PackageManager. PERMISSION_GRANTED)
-        ){
-            if (android.os.Build.VERSION.SDK_INT > 31){
-                Toast.makeText(this, "Accept Permissions!", Toast.LENGTH_LONG).show();
-                MainActivity.this.finish();
-                System.exit(0);
-            }
-        }
+    @SuppressLint("MissingPermission")
+    private void enableBt(){
+        Intent enableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
+        startActivity(enableIntent);
     }
 
     @SuppressLint("MissingPermission")
@@ -232,19 +247,6 @@ public class MainActivity extends AppCompatActivity {
         Intent discoverableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
         discoverableIntent.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 60);
         startActivity(discoverableIntent);
-    }
-
-    @SuppressLint("MissingPermission")
-    private void enableBt(){
-        if(BluetoothAdapter.getDefaultAdapter() == null){
-            MainActivity.this.finish();
-            System.exit(0);
-        }
-
-        if(BluetoothAdapter.getDefaultAdapter().isEnabled()){
-            Intent enableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
-            startActivity(enableIntent);
-        }
     }
 
     private void openNativeDevicePicker(){
@@ -348,15 +350,15 @@ public class MainActivity extends AppCompatActivity {
             if (action.equals("android.bluetooth.devicepicker.action.DEVICE_SELECTED")) {
                 BluetoothDevice dev = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
                 Log.e(TAG, "Pick Device: " + dev.getName() + "\n" + dev.getAddress());
+                devAdapter.cancelDiscovery();
 
                 if(dev.getBondState() == BluetoothDevice.BOND_NONE){
                     IntentFilter filter = new IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED);
                     registerReceiver(devicePairReceiver, filter);
                     dev.createBond();
-                    unregisterReceiver(devicePairReceiver);
                 }else{
-                    connectPeer(dev);
                     unregisterReceiver(nativeDevicePickerReceiver);
+                    connectPeer(dev);
                 }
             }
         }
@@ -372,8 +374,8 @@ public class MainActivity extends AppCompatActivity {
                 BluetoothDevice mDevice = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
                 if (mDevice.getBondState() == BluetoothDevice.BOND_BONDED) {
                     Log.d(TAG, "BroadcastReceiver: BOND_BONDED.");
-                    connectPeer(mDevice);
                     unregisterReceiver(devicePairReceiver);
+                    connectPeer(mDevice);
                 }
             }
         }
@@ -385,7 +387,7 @@ public class MainActivity extends AppCompatActivity {
 
             BluetoothServerSocket tmp;
             try {
-                tmp = BluetoothAdapter.getDefaultAdapter().listenUsingInsecureRfcommWithServiceRecord(
+                tmp = devAdapter.listenUsingInsecureRfcommWithServiceRecord(
                         BEORC_NAME, BEORC_UUID);
             } catch (IOException e) {
                 throw new RuntimeException(e);
@@ -402,7 +404,6 @@ public class MainActivity extends AppCompatActivity {
 
                 if (availableSocket != null) {
                     Log.e(TAG, "Socket accepted "+ availableSocket.getRemoteDevice().getName());
-
                     connectionState = 1;
                     setUiConnected(availableSocket.getRemoteDevice().getName());
                     chatReceiver = new PeerMessageWaiter();
