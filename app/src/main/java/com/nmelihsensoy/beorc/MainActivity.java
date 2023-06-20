@@ -94,15 +94,6 @@ public class MainActivity extends AppCompatActivity {
         setConnectedDeviceTitle();
         initMessageList();
         initMessageBox();
-
-        Button button1 = (Button) findViewById(R.id.button);
-        button1.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                String msgTmp = "Merhaba Dünya";
-                writeToSocket(msgTmp.getBytes());
-            }
-        });
     }
 
     @Override
