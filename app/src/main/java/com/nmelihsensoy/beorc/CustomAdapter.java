@@ -48,11 +48,11 @@ public class CustomAdapter extends RecyclerView.Adapter<CustomAdapter.ViewHolder
     public ViewHolder onCreateViewHolder(ViewGroup viewGroup, int viewType) {
         View view;
 
-        if(viewType == 1){
+        if(viewType == MessageData.TYPE_LEFT_BUBBLE){
             view = LayoutInflater.from(viewGroup.getContext())
                     .inflate(R.layout.bubble_left, viewGroup, false);
             return new ViewHolder(view);
-        }else if(viewType == 2){
+        }else if(viewType == MessageData.TYPE_RIGHT_BUBBLE){
             view = LayoutInflater.from(viewGroup.getContext())
                     .inflate(R.layout.bubble_right, viewGroup, false);
             return new ViewHolder(view);

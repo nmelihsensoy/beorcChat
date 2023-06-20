@@ -16,7 +16,9 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
+import android.view.View;
 import android.view.inputmethod.EditorInfo;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
 
@@ -76,7 +78,7 @@ public class MainActivity extends AppCompatActivity {
 
         devAdapter = BluetoothAdapter.getDefaultAdapter();
         if(!devAdapter.isEnabled()){
-            Intent enableIntent = new Intent(devAdapter.ACTION_REQUEST_ENABLE);
+            Intent enableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
             startActivity(enableIntent);
         }
 
@@ -100,7 +102,7 @@ public class MainActivity extends AppCompatActivity {
         if(availableSocket == null){
             chatPeer = new PeerConnWaiter();
             chatPeer.start();
-        }else if(availableSocket != null && !availableSocket.isConnected()){
+        }else if(!availableSocket.isConnected()){
             chatPeer = new PeerConnWaiter();
             chatPeer.start();
         }
@@ -124,11 +126,6 @@ public class MainActivity extends AppCompatActivity {
         messageAdapter = new CustomAdapter(messageStoreList);
         recyclerView.setLayoutManager(new LinearLayoutManager(this));
         recyclerView.setAdapter(messageAdapter);
-    }
-
-    private void clearMessageList(){
-        messageStoreList.clear();
-        messageAdapter.notifyDataSetChanged();
     }
 
     private void scrollMessageListToLatest(){
@@ -165,11 +162,6 @@ public class MainActivity extends AppCompatActivity {
         messageBox.setEnabled(true);
     }
 
-    private void disableMessageBox(){
-        EditText messageBox = (EditText) findViewById(R.id.msgText);
-        messageBox.setEnabled(false);
-    }
-
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         MenuInflater inflater = getMenuInflater();
@@ -191,21 +183,28 @@ public class MainActivity extends AppCompatActivity {
     public boolean onOptionsItemSelected(MenuItem item) {
         int id = item.getItemId();
 
-        if (id == R.id.menu_connect) {
+        if(id == R.id.menu_connect) {
             Log.d(TAG, "Menu Connect");
             openNativeDevicePicker();
             return true;
         }
-        if (id == R.id.menu_discoverable) {
+        if(id == R.id.menu_discoverable) {
             Log.d(TAG, "Menu Discoverable");
             makeDiscoverable();
             return true;
         }
-        if (id == R.id.menu_disconnect) {
+        if(id == R.id.menu_disconnect) {
             Log.d(TAG, "Menu Disconnect");
             disconnectPeer();
             return true;
         }
+        if(id == R.id.menu_about){
+            Log.d(TAG, "Menu About");
+            Intent switchActivityIntent = new Intent(this, AboutActivity.class);
+            startActivity(switchActivityIntent);
+            return true;
+        }
+
         return super.onOptionsItemSelected(item);
     }
 
@@ -237,12 +236,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @SuppressLint("MissingPermission")
-    private void enableBt(){
-        Intent enableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
-        startActivity(enableIntent);
-    }
-
-    @SuppressLint("MissingPermission")
     private void makeDiscoverable(){
         Intent discoverableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
         discoverableIntent.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 60);
@@ -265,15 +258,6 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    private void setUiDisconnected(){
-        runOnUiThread(() -> {
-            MainActivity.this.invalidateOptionsMenu();
-            setConnectedDeviceTitle();
-            disableMessageBox();
-            clearMessageList();
-        });
-    }
-
     private void newMessageUi(MessageData msg){
         runOnUiThread(() -> {
             this.newMessage(msg);
@@ -284,7 +268,7 @@ public class MainActivity extends AppCompatActivity {
     private void sendMessage(String messageLine){
         if(!messageLine.isEmpty()){
             Log.d(TAG, messageLine);
-            newMessage(new MessageData(messageLine, 2));
+            newMessage(new MessageData(messageLine, MessageData.TYPE_RIGHT_BUBBLE));
             scrollMessageListToLatest();
             writeToSocket(messageLine.getBytes());
         }
@@ -430,7 +414,7 @@ public class MainActivity extends AppCompatActivity {
                 while((bytes = tmpIn.read(buffer))!=-1) {
                     String readMessage = new String(buffer, 0, bytes);
                     Log.d(TAG, "RECEIVED: " + readMessage);
-                    newMessageUi(new MessageData(readMessage, 1));
+                    newMessageUi(new MessageData(readMessage, MessageData.TYPE_LEFT_BUBBLE));
                 }
             } catch (IOException e) {
                 disconnectPeer();

@@ -4,6 +4,9 @@ public class MessageData {
     private String message;
     private int type;
 
+    public final static int TYPE_LEFT_BUBBLE = 1;
+    public final static int TYPE_RIGHT_BUBBLE = 1;
+
     public MessageData(String message, int type) {
         this.message = message;
         this.type = type;
