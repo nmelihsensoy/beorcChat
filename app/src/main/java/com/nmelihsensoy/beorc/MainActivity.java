@@ -128,11 +128,6 @@ public class MainActivity extends AppCompatActivity {
         recyclerView.setAdapter(messageAdapter);
     }
 
-    private void clearMessageList(){
-        messageStoreList.clear();
-        messageAdapter.notifyDataSetChanged();
-    }
-
     private void scrollMessageListToLatest(){
         if(recyclerView != null){
             recyclerView.scrollToPosition(messageStoreList.size() - 1);
@@ -165,11 +160,6 @@ public class MainActivity extends AppCompatActivity {
     private void enableMessageBox(){
         EditText messageBox = (EditText) findViewById(R.id.msgText);
         messageBox.setEnabled(true);
-    }
-
-    private void disableMessageBox(){
-        EditText messageBox = (EditText) findViewById(R.id.msgText);
-        messageBox.setEnabled(false);
     }
 
     @Override
@@ -246,12 +236,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @SuppressLint("MissingPermission")
-    private void enableBt(){
-        Intent enableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
-        startActivity(enableIntent);
-    }
-
-    @SuppressLint("MissingPermission")
     private void makeDiscoverable(){
         Intent discoverableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
         discoverableIntent.putExtra(BluetoothAdapter.EXTRA_DISCOVERABLE_DURATION, 60);
@@ -274,15 +258,6 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    private void setUiDisconnected(){
-        runOnUiThread(() -> {
-            MainActivity.this.invalidateOptionsMenu();
-            setConnectedDeviceTitle();
-            disableMessageBox();
-            clearMessageList();
-        });
-    }
-
     private void newMessageUi(MessageData msg){
         runOnUiThread(() -> {
             this.newMessage(msg);
@@ -293,7 +268,7 @@ public class MainActivity extends AppCompatActivity {
     private void sendMessage(String messageLine){
         if(!messageLine.isEmpty()){
             Log.d(TAG, messageLine);
-            newMessage(new MessageData(messageLine, 2));
+            newMessage(new MessageData(messageLine, MessageData.TYPE_RIGHT_BUBBLE));
             scrollMessageListToLatest();
             writeToSocket(messageLine.getBytes());
         }
@@ -439,7 +414,7 @@ public class MainActivity extends AppCompatActivity {
                 while((bytes = tmpIn.read(buffer))!=-1) {
                     String readMessage = new String(buffer, 0, bytes);
                     Log.d(TAG, "RECEIVED: " + readMessage);
-                    newMessageUi(new MessageData(readMessage, 1));
+                    newMessageUi(new MessageData(readMessage, MessageData.TYPE_LEFT_BUBBLE));
                 }
             } catch (IOException e) {
                 disconnectPeer();
