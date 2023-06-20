@@ -18,6 +18,7 @@
         android:id="@+id/message_list"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:layout_marginBottom="15dp"
         android:layout_weight="1"
         app:stackFromEnd="true"
         >
@@ -47,5 +48,11 @@
             android:maxLines="1"
             android:text="" />
     </LinearLayout>
+
+    <Button
+        android:id="@+id/button"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Button" />
 
 </LinearLayout>

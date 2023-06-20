@@ -10,4 +10,8 @@
     <item android:id="@+id/menu_disconnect"
         android:enabled="false"
         android:title="Disconnect" />
+
+    <item android:id="@+id/menu_about"
+        android:enabled="true"
+        android:title="About" />
 </menu>

@@ -16,7 +16,9 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
+import android.view.View;
 import android.view.inputmethod.EditorInfo;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
 
@@ -76,7 +78,7 @@ public class MainActivity extends AppCompatActivity {
 
         devAdapter = BluetoothAdapter.getDefaultAdapter();
         if(!devAdapter.isEnabled()){
-            Intent enableIntent = new Intent(devAdapter.ACTION_REQUEST_ENABLE);
+            Intent enableIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
             startActivity(enableIntent);
         }
 
@@ -92,6 +94,15 @@ public class MainActivity extends AppCompatActivity {
         setConnectedDeviceTitle();
         initMessageList();
         initMessageBox();
+
+        Button button1 = (Button) findViewById(R.id.button);
+        button1.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                String msgTmp = "Merhaba Dünya";
+                writeToSocket(msgTmp.getBytes());
+            }
+        });
     }
 
     @Override
@@ -100,7 +111,7 @@ public class MainActivity extends AppCompatActivity {
         if(availableSocket == null){
             chatPeer = new PeerConnWaiter();
             chatPeer.start();
-        }else if(availableSocket != null && !availableSocket.isConnected()){
+        }else if(!availableSocket.isConnected()){
             chatPeer = new PeerConnWaiter();
             chatPeer.start();
         }
@@ -191,21 +202,28 @@ public class MainActivity extends AppCompatActivity {
     public boolean onOptionsItemSelected(MenuItem item) {
         int id = item.getItemId();
 
-        if (id == R.id.menu_connect) {
+        if(id == R.id.menu_connect) {
             Log.d(TAG, "Menu Connect");
             openNativeDevicePicker();
             return true;
         }
-        if (id == R.id.menu_discoverable) {
+        if(id == R.id.menu_discoverable) {
             Log.d(TAG, "Menu Discoverable");
             makeDiscoverable();
             return true;
         }
-        if (id == R.id.menu_disconnect) {
+        if(id == R.id.menu_disconnect) {
             Log.d(TAG, "Menu Disconnect");
             disconnectPeer();
             return true;
         }
+        if(id == R.id.menu_about){
+            Log.d(TAG, "Menu About");
+            Intent switchActivityIntent = new Intent(this, AboutActivity.class);
+            startActivity(switchActivityIntent);
+            return true;
+        }
+
         return super.onOptionsItemSelected(item);
     }
 
