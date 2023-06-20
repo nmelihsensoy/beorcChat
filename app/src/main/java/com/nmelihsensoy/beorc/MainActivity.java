@@ -48,6 +48,8 @@ public class MainActivity extends AppCompatActivity {
     private PeerMessageWaiter chatReceiver = null;
     private RecyclerView recyclerView = null;
     private BluetoothAdapter devAdapter = null;
+    private Toolbar toolbar1 = null;
+    private EditText messageBox = null;
 
     @SuppressLint("MissingPermission")
     @Override
@@ -91,6 +93,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         setContentView(R.layout.activity_main);
+        initToolbar();
         setConnectedDeviceTitle();
         initMessageList();
         initMessageBox();
@@ -108,9 +111,21 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    @Override
+    protected void onStart() {
+        super.onStart();
+        IntentFilter filter = new IntentFilter("android.bluetooth.devicepicker.action.DEVICE_SELECTED");
+        registerReceiver(nativeDevicePickerReceiver, filter);
+    }
+
+    private void initToolbar(){
+        toolbar1 = (Toolbar) findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar1);
+    }
+
     private void initMessageBox(){
-        EditText editText = findViewById(R.id.msgText);
-        editText.setOnEditorActionListener((textView, i, keyEvent) -> {
+        messageBox = findViewById(R.id.msgText);
+        messageBox.setOnEditorActionListener((textView, i, keyEvent) -> {
             if(i == EditorInfo.IME_ACTION_DONE){
                 sendMessage(textView.getText().toString());
                 textView.setText("");
@@ -128,6 +143,11 @@ public class MainActivity extends AppCompatActivity {
         recyclerView.setAdapter(messageAdapter);
     }
 
+    private void clearMessageList(){
+        messageStoreList.clear();
+        messageAdapter.notifyDataSetChanged();
+    }
+
     private void scrollMessageListToLatest(){
         if(recyclerView != null){
             recyclerView.scrollToPosition(messageStoreList.size() - 1);
@@ -135,18 +155,21 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void setConnectedDeviceTitle(String deviceName){
-        Toolbar toolbar1 = (Toolbar) findViewById(R.id.toolbar);
         if(toolbar1 != null){
-            setSupportActionBar(toolbar1);
             toolbar1.setSubtitle("connected: "+deviceName);
         }
     }
 
     private void setConnectedDeviceTitle(){
-        Toolbar toolbar1 = (Toolbar) findViewById(R.id.toolbar);
+        if(toolbar1 != null){
+            toolbar1.setSubtitle("not connected");
+        }
+    }
+
+    private void setPairingDeviceTitle(){
         if(toolbar1 != null){
             setSupportActionBar(toolbar1);
-            toolbar1.setSubtitle("not connected");
+            toolbar1.setSubtitle("pairing...");
         }
     }
 
@@ -158,8 +181,11 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void enableMessageBox(){
-        EditText messageBox = (EditText) findViewById(R.id.msgText);
         messageBox.setEnabled(true);
+    }
+
+    private void disableMessageBox(){
+        messageBox.setEnabled(false);
     }
 
     @Override
@@ -167,15 +193,17 @@ public class MainActivity extends AppCompatActivity {
         MenuInflater inflater = getMenuInflater();
         inflater.inflate(R.menu.menu, menu);
         topBarMenu = menu;
-        setDisconnectMenuEnabled(menu.getItem(2));
+        setItemEnabledByConnection(menu.getItem(2), true);
+        setItemEnabledByConnection(menu.getItem(0), false);
         return true;
     }
 
-    private void setDisconnectMenuEnabled(MenuItem item){
+    private void setItemEnabledByConnection(MenuItem item, boolean status){
         if(availableSocket != null && availableSocket.isConnected()){
-            item.setEnabled(true);
+            //connected
+            item.setEnabled(status);
         }else{
-            item.setEnabled(false);
+            item.setEnabled(!status);
         }
     }
 
@@ -200,39 +228,22 @@ public class MainActivity extends AppCompatActivity {
         }
         if(id == R.id.menu_about){
             Log.d(TAG, "Menu About");
-            Intent switchActivityIntent = new Intent(this, AboutActivity.class);
-            startActivity(switchActivityIntent);
+            openAboutPage();
             return true;
         }
 
         return super.onOptionsItemSelected(item);
     }
 
-    /* https://stackoverflow.com/a/48758656 */
-    public void restartApplication(final @NonNull Activity activity) {
-        final PackageManager pm = activity.getPackageManager();
-        final Intent intent = pm.getLaunchIntentForPackage(activity.getPackageName());
-        activity.finishAffinity();
-        activity.startActivity(intent);
-        System.exit(0);
-    }
-
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (availableSocket != null){
-            if(this.availableSocket.isConnected()){
-                try {
-                    this.availableSocket.close();
-                } catch (IOException e) {
-
-                }
-            }
+        try {
+            this.availableSocket.close();
+        } catch (IOException e) {
+            Log.d(TAG, e.getMessage());
         }
-        chatPeer = null;
-        connectionState = -1;
-        chatReceiver = null;
-        Runtime.getRuntime().gc();
+        unregisterReceiver(nativeDevicePickerReceiver);
     }
 
     @SuppressLint("MissingPermission")
@@ -243,11 +254,13 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void openNativeDevicePicker(){
-        IntentFilter filter = new IntentFilter("android.bluetooth.devicepicker.action.DEVICE_SELECTED");
-        registerReceiver(nativeDevicePickerReceiver, filter);
-
         Intent devicePickerIntent = new Intent("android.bluetooth.devicepicker.action.LAUNCH");
         startActivity(devicePickerIntent);
+    }
+
+    private void openAboutPage(){
+        Intent switchActivityIntent = new Intent(this, AboutActivity.class);
+        startActivity(switchActivityIntent);
     }
 
     private void setUiConnected(String devName){
@@ -255,6 +268,15 @@ public class MainActivity extends AppCompatActivity {
             MainActivity.this.invalidateOptionsMenu();
             setConnectedDeviceTitle(devName);
             enableMessageBox();
+        });
+    }
+
+    private void setUiDisconnected(){
+        runOnUiThread(() -> {
+            MainActivity.this.invalidateOptionsMenu();
+            setConnectedDeviceTitle();
+            disableMessageBox();
+            clearMessageList();
         });
     }
 
@@ -275,18 +297,15 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void disconnectPeer(){
-        runOnUiThread(() -> {
-            if (availableSocket != null){
-                if(this.availableSocket.isConnected()){
-                    try {
-                        this.availableSocket.close();
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
-                    }
+        if (availableSocket != null){
+            if(this.availableSocket.isConnected()){
+                try {
+                    this.availableSocket.close();
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
                 }
             }
-            restartApplication(MainActivity.this);
-        });
+        }
     }
 
 
@@ -337,11 +356,11 @@ public class MainActivity extends AppCompatActivity {
                 devAdapter.cancelDiscovery();
 
                 if(dev.getBondState() == BluetoothDevice.BOND_NONE){
+                    setPairingDeviceTitle();
                     IntentFilter filter = new IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED);
                     registerReceiver(devicePairReceiver, filter);
                     dev.createBond();
                 }else{
-                    unregisterReceiver(nativeDevicePickerReceiver);
                     connectPeer(dev);
                 }
             }
@@ -387,6 +406,12 @@ public class MainActivity extends AppCompatActivity {
                 }
 
                 if (availableSocket != null) {
+                    try {
+                        // close BluetoothServerSocket
+                        tmp.close();
+                    } catch (IOException e) {
+
+                    }
                     Log.e(TAG, "Socket accepted "+ availableSocket.getRemoteDevice().getName());
                     connectionState = 1;
                     setUiConnected(availableSocket.getRemoteDevice().getName());
@@ -418,6 +443,7 @@ public class MainActivity extends AppCompatActivity {
                 }
             } catch (IOException e) {
                 disconnectPeer();
+                setUiDisconnected();
             }
         }
     }
